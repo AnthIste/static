@@ -1,4 +1,4 @@
-#![feature(core, io)]
+#![feature(io)]
 
 extern crate hyper;
 extern crate iron;
@@ -8,10 +8,10 @@ extern crate "static" as static_file;
 use hyper::header::Location;
 use iron::method::Method::Get;
 use iron::{Url, Handler};
+use iron::status::Status;
 use iron_test::{mock, ProjectBuilder};
 use static_file::Static;
 use std::old_io::util::NullReader;
-use std::num::ToPrimitive;
 
 #[test]
 fn serves_non_default_file_from_absolute_root_path() {
@@ -56,9 +56,7 @@ fn returns_404_if_file_not_found() {
                                      &mut reader);
 
     match st.handle(&mut req) {
-        Ok(res) => {
-            assert_eq!(res.status.and_then(|t| t.to_u64()).unwrap(), 404);
-        },
+        Ok(res) => assert_eq!(res.status.unwrap(), Status::NotFound),
         Err(e) => panic!("{}", e)
     }
 }
@@ -76,7 +74,7 @@ fn redirects_if_trailing_slash_is_missing() {
 
     match st.handle(&mut req) {
         Ok(res) => {
-            assert_eq!(res.status.and_then(|t| t.to_u64()).unwrap(), 301);
+            assert_eq!(res.status.unwrap(), Status::MovedPermanently);
             assert_eq!(res.headers.get::<Location>().unwrap(),
                        &Location("http://localhost:3000/dir/".to_string()));
         },

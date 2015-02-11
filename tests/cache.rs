@@ -1,4 +1,4 @@
-#![feature(core, io)]
+#![feature(io)]
 
 extern crate time;
 
@@ -11,11 +11,11 @@ use time::Timespec;
 
 use iron::{Handler, Url};
 use iron::method::Method::Get;
+use iron::status::Status;
 use hyper::header::{IfModifiedSince, CacheControl, LastModified};
 use iron_test::{mock, ProjectBuilder};
 use static_file::StaticWithCache;
 use std::old_io::util::NullReader;
-use std::num::ToPrimitive;
 
 #[test]
 fn it_should_return_cache_headers() {
@@ -47,7 +47,7 @@ fn it_should_return_the_file_if_client_sends_no_modified_time() {
                                      Url::parse("http://localhost:3000/file1.html").unwrap(),
                                      &mut reader);
     match st.handle(&mut req) {
-        Ok(res) => assert_eq!(res.status.and_then(|t| t.to_u64()).unwrap(), 200),
+        Ok(res) => assert_eq!(res.status.unwrap(), Status::Ok),
         Err(e) => panic!("{}", e)
     }
 }
@@ -67,7 +67,7 @@ fn it_should_return_the_file_if_client_has_old_version() {
     let one_hour_ago = Timespec::new(now.sec - 3600, now.nsec);
     req.headers.set(IfModifiedSince(time::at(one_hour_ago)));
     match st.handle(&mut req) {
-        Ok(res) => assert_eq!(res.status.and_then(|t| t.to_u64()).unwrap(), 200),
+        Ok(res) => assert_eq!(res.status.unwrap(), Status::Ok),
         Err(e) => panic!("{}", e)
     }
 }
@@ -84,7 +84,7 @@ fn it_should_return_304_if_client_has_file_cached() {
                                      &mut reader);
     req.headers.set(IfModifiedSince(time::now_utc()));
     match st.handle(&mut req) {
-        Ok(res) => assert_eq!(res.status.and_then(|t| t.to_u64()).unwrap(), 304),
+        Ok(res) => assert_eq!(res.status.unwrap(), Status::NotModified),
         Err(e) => panic!("{}", e)
     }
 }
@@ -101,7 +101,7 @@ fn it_should_cache_index_html_for_directory_path() {
                                      &mut reader);
     req.headers.set(IfModifiedSince(time::now_utc()));
     match st.handle(&mut req) {
-        Ok(res) => assert_eq!(res.status.and_then(|t| t.to_u64()).unwrap(), 304),
+        Ok(res) => assert_eq!(res.status.unwrap(), Status::NotModified),
         Err(e) => panic!("{}", e)
     }
 }
@@ -119,7 +119,7 @@ fn it_should_defer_to_static_handler_if_directory_misses_trailing_slash() {
     req.headers.set(IfModifiedSince(time::now_utc()));
     match st.handle(&mut req) {
         Ok(res) => {
-            assert_eq!(res.status.and_then(|t| t.to_u64()).unwrap(), 301);
+            assert_eq!(res.status.unwrap(), Status::MovedPermanently);
             assert!(res.headers.get::<LastModified>().is_none());
         },
         Err(e) => panic!("{}", e)
