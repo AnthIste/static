@@ -1,12 +1,10 @@
-use std::io::fs::PathExtensions;
-use time::{mod, Timespec};
+use std::old_io::fs::PathExtensions;
+use time::{self, Timespec};
 
 use iron::{status, Handler, IronResult, IronError, Request, Response};
-use iron::response::modifiers::Status;
-use iron::errors::FileError;
 
 use requested_path::RequestedPath;
-use {Static};
+use Static;
 
 /// Extends the `Static` handler with 304 caching.
 ///
@@ -29,14 +27,14 @@ impl StaticWithCache {
     // Defers to the static handler, but adds cache headers to the response.
     fn defer_and_cache(&self, request: &mut Request,
                        modified: Timespec) -> IronResult<Response> {
-        use hyper::header::{CacheControl, LastModified};
-        use hyper::header::common::cache_control::CacheDirective::{Public, MaxAge};
+        use hyper::header::{CacheControl, LastModified, CacheDirective};
 
-        match self.static_handler.call(request) {
+        match self.static_handler.handle(request) {
             Err(error) => Err(error),
 
             Ok(mut response) => {
-                response.headers.set(CacheControl(vec![Public, MaxAge(31536000)]));
+                let cache = vec![CacheDirective::Public, CacheDirective::MaxAge(31536000)];
+                response.headers.set(CacheControl(cache));
                 response.headers.set(LastModified(time::at(modified)));
                 Ok(response)
             },
@@ -45,24 +43,20 @@ impl StaticWithCache {
 }
 
 impl Handler for StaticWithCache {
-    fn call(&self, request: &mut Request) -> IronResult<Response> {
-        use iron::Set;
+    fn handle(&self, request: &mut Request) -> IronResult<Response> {
         use hyper::header::IfModifiedSince;
 
         let requested_path = RequestedPath::new(&self.static_handler.root_path, request);
 
         if requested_path.should_redirect(request) {
-            return self.static_handler.call(request);
+            return self.static_handler.handle(request);
         }
 
         match requested_path.get_file() {
             Some(file) => {
                 let last_modified_time = match file.stat() {
-                    Err(error) => return Err(box FileError(error) as IronError),
-
-                    Ok(file_stat) => {
-                        Timespec::new((file_stat.modified / 1000) as i64, 0)
-                    }
+                    Err(error) => return Err(IronError::new(error, status::InternalServerError)),
+                    Ok(file_stat) => Timespec::new((file_stat.modified / 1000) as i64, 0)
                 };
 
                 let if_modified_since = match request.headers.get::<IfModifiedSince>()
@@ -72,13 +66,13 @@ impl Handler for StaticWithCache {
                 };
 
                 if last_modified_time <= if_modified_since {
-                    Ok(Response::new().set(Status(status::NotModified)))
+                    Ok(Response::with(status::NotModified))
                 } else {
                     self.defer_and_cache(request, last_modified_time)
                 }
             },
 
-            None => self.static_handler.call(request)
+            None => self.static_handler.handle(request)
         }
     }
 }
