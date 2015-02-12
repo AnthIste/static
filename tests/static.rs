@@ -56,8 +56,8 @@ fn returns_404_if_file_not_found() {
                                      &mut reader);
 
     match st.handle(&mut req) {
-        Ok(res) => assert_eq!(res.status.unwrap(), Status::NotFound),
-        Err(e) => panic!("{}", e)
+        Ok(res) => panic!("Expected IronError, got Response: {}", res),
+        Err(e) => assert_eq!(e.response.status.unwrap(), Status::NotFound)
     }
 }
 

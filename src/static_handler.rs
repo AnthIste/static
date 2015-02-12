@@ -1,4 +1,7 @@
-use iron::{Request, Response, Handler, IronResult, status};
+use std::error::Error;
+use std::fmt;
+
+use iron::{Request, Response, Handler, IronResult, IronError, status};
 use iron::modifiers::Redirect;
 use mount::OriginalUrl;
 use requested_path::RequestedPath;
