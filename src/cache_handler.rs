@@ -53,10 +53,12 @@ impl Handler for StaticWithCache {
         }
 
         match requested_path.get_file() {
+            None => self.static_handler.handle(request),
+
             Some(file) => {
                 let last_modified_time = match file.stat() {
                     Err(error) => return Err(IronError::new(error, status::InternalServerError)),
-                    Ok(file_stat) => Timespec::new((file_stat.modified / 1000) as i64, 0)
+                    Ok(file_stat) => Timespec::new((file_stat.modified / 1000) as i64, 0),
                 };
 
                 let if_modified_since = match request.headers.get::<IfModifiedSince>()
@@ -71,8 +73,6 @@ impl Handler for StaticWithCache {
                     self.defer_and_cache(request, last_modified_time)
                 }
             },
-
-            None => self.static_handler.handle(request)
         }
     }
 }

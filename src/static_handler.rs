@@ -56,10 +56,24 @@ impl Handler for Static {
         }
 
         match requested_path.get_file() {
-            // Won't panic because we know the file exists from get_file
-            Some(path) => Ok(Response::with((status::Ok, path))),
             // If no file is found, return a 404 response.
-            None => Ok(Response::with((status::NotFound, "File not found")))
+            None => Err(IronError::new(NoFile, status::NotFound)),
+            // Won't panic because we know the file exists from get_file.
+            Some(path) => Ok(Response::with((status::Ok, path))),
         }
+    }
+}
+
+/// Thrown if no file is found. It is always accompanied by a NotFound response.
+#[derive(Debug)]
+pub struct NoFile;
+
+impl Error for NoFile {
+    fn description(&self) -> &str { "File not found" }
+}
+
+impl fmt::Display for NoFile {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.write_str(self.description())
     }
 }
