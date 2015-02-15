@@ -3,8 +3,12 @@ use std::fmt;
 
 use iron::{Request, Response, Handler, IronResult, IronError, status};
 use iron::modifiers::Redirect;
+use iron::{Request, Response, Url, Handler, IronResult, Set};
+use iron::response::modifiers::{Status, Body, Redirect, ContentType};
+use iron::status;
 use mount::OriginalUrl;
 use requested_path::RequestedPath;
+use mime_types::Types;
 
 /// The static file-serving `Handler`.
 ///
@@ -22,7 +26,9 @@ use requested_path::RequestedPath;
 #[derive(Clone)]
 pub struct Static {
     /// The path this handler is serving files from.
-    pub root_path: Path
+    pub root_path: Path,
+    /// The stored mime-type mapping
+    pub types: Types,
 }
 
 impl Static {
@@ -30,7 +36,7 @@ impl Static {
     ///
     /// If `Path::new("")` is given, files will be served from the current directory.
     pub fn new(root_path: Path) -> Static {
-        Static { root_path: root_path }
+        Static { root_path: root_path, types: Types::new().unwrap() }
     }
 }
 
@@ -63,6 +69,18 @@ impl Handler for Static {
             None => Err(IronError::new(NoFile, status::NotFound)),
             // Won't panic because we know the file exists from get_file.
             Some(path) => Ok(Response::with((status::Ok, path))),
+            Some(path) => {
+                let mime = from_str(self.types.mime_for_path(&path))
+                    .unwrap_or_else(|| from_str("text/plain").unwrap());
+                Ok(Response::new()
+                       .set(Status(status::Ok))
+                       // Won't panic because we know the file exists from get_file
+                       .set(Body(path))
+                       .set(ContentType(mime)))
+            }
+            None =>
+                // If no file is found, return a 404 response.
+                Ok(Response::new().set(Status(status::NotFound)).set(Body("File not found")))
         }
     }
 }
