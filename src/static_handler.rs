@@ -1,10 +1,9 @@
 use std::error::Error;
 use std::fmt;
 
-use iron::{Request, Response, Handler, IronResult, IronError, status};
+use iron::{Request, Response, Handler, IronResult, IronError};
 use iron::modifiers::Redirect;
-use iron::{Request, Response, Url, Handler, IronResult, Set};
-use iron::response::modifiers::{Status, Body, Redirect, ContentType};
+use iron::mime::{Mime};
 use iron::status;
 use mount::OriginalUrl;
 use requested_path::RequestedPath;
@@ -67,20 +66,13 @@ impl Handler for Static {
         match requested_path.get_file() {
             // If no file is found, return a 404 response.
             None => Err(IronError::new(NoFile, status::NotFound)),
+            
             // Won't panic because we know the file exists from get_file.
-            Some(path) => Ok(Response::with((status::Ok, path))),
             Some(path) => {
-                let mime = from_str(self.types.mime_for_path(&path))
-                    .unwrap_or_else(|| from_str("text/plain").unwrap());
-                Ok(Response::new()
-                       .set(Status(status::Ok))
-                       // Won't panic because we know the file exists from get_file
-                       .set(Body(path))
-                       .set(ContentType(mime)))
+                let mime: Mime = self.types.mime_for_path(&path).parse().unwrap();
+
+                Ok(Response::with((status::Ok, mime, path)))
             }
-            None =>
-                // If no file is found, return a 404 response.
-                Ok(Response::new().set(Status(status::NotFound)).set(Body("File not found")))
         }
     }
 }
